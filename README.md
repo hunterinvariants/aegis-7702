@@ -14,15 +14,15 @@ adds that missing layer as a Slither plugin.
 
 ## What it catches
 
-| Argument | What it flags | Severity |
-| :--- | :--- | :--- |
-| `eip7702-unprotected-entrypoint` | An execute/call entrypoint with no caller check -- anyone can drive the account | High |
-| `eip7702-recallable-initializer` | An initializer with no real one-shot guard -- re-init and seize the account | High |
-| `eip7702-missing-nonce` | A signed action with no nonce -- replay it at will | High |
-| `eip7702-replay-unsafe-sig` | A signature that doesn't bind chainId -- replay it on another chain | Medium |
-| `eip7702-unsafe-eoa-assumption` | `tx.origin == msg.sender` used as an "is-EOA" check -- 7702 breaks it | Medium |
-| `eip7702-constructor-state` | Security state set in the constructor -- gone the moment an EOA delegates | Medium |
-| `eip7702-storage-collision` | Plain (non-namespaced) storage -- re-delegation can corrupt it; use ERC-7201 | Informational |
+- `eip7702-unprotected-entrypoint` (High) -- an execute/call entrypoint with no caller check; anyone can drive the account.
+- `eip7702-recallable-initializer` (High) -- an initializer with no real one-shot guard; re-init and seize the account.
+- `eip7702-missing-nonce` (High) -- a signed action with no nonce; replay it at will.
+- `eip7702-replay-unsafe-sig` (Medium) -- a signature that doesn't bind chainId; replay it on another chain.
+- `eip7702-unsafe-eoa-assumption` (Medium) -- `tx.origin == msg.sender` used as an "is-EOA" check, which 7702 breaks.
+- `eip7702-constructor-state` (Medium) -- security state set in the constructor; gone the moment an EOA delegates.
+- `eip7702-storage-collision` (Informational) -- plain (non-namespaced) storage; re-delegation can corrupt it. Use ERC-7201.
+
+Full writeups -- with a vulnerable example and the fix for each -- are in `docs/detectors.md`.
 
 ## Does it work?
 
@@ -45,7 +45,7 @@ delegates, and it flags every vulnerability class in there (V0 through V6).
 
     slither <target> --detect eip7702-unprotected-entrypoint,eip7702-missing-nonce,eip7702-replay-unsafe-sig
 
-Add the remaining arguments from the table to run the whole pack.
+Add the remaining arguments from the list above to run the whole pack.
 
 ## Where it's headed
 

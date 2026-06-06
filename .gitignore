@@ -7,3 +7,6 @@ dist/
 .venv/
 venv/
 .DS_Store
+lib/
+out/
+cache/

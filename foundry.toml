@@ -1,0 +1,8 @@
+[profile.default]
+src = "corpus"
+test = "harnesses"
+out = "out"
+libs = ["lib"]
+evm_version = "prague"
+solc = "0.8.34"
+bytecode_hash = "none"

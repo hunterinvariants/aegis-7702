@@ -47,11 +47,22 @@ delegates, and it flags every vulnerability class in there (V0 through V6).
 
 Add the remaining arguments from the list above to run the whole pack.
 
-## Where it's headed
+## Dynamic harnesses
 
-The static detectors are done and tested. Next is a set of Foundry harnesses that actually run a
-delegate under 7702 conditions -- switching delegates, replaying signatures -- to confirm the
-multi-transaction issues (storage contamination especially) dynamically, not just flag them.
+Static flags are the cheap layer. The 7702 bugs that actually bite are multi-transaction -- they only
+surface once an account switches delegates or a signature gets reused -- so the detectors are backed
+by Foundry harnesses in `harnesses/` that run a delegate under real 7702 conditions and execute the
+exploit. Same two-way discipline as the corpus: the attack lands on the broken delegate and reverts
+on the safe one.
+
+    forge test
+    -> 6/6 (evm_version = prague)
+
+- storage collision -- a value left at slot 0 by one delegate is read as `owner` by the next, and the account is seized. The ERC-7201 namespaced delegate resists.
+- missing nonce -- a single signature replays and sends twice; the nonce-tracking version blocks the second send.
+- recallable initializer -- a second `initialize` seizes the account; the guarded version reverts.
+
+So a reviewer can watch the exact bug a detector flags actually fire -- not take the flag on faith.
 
 High and Medium findings are real bugs worth reviewing. Informational (storage-collision) is a
 "prefer ERC-7201" heads-up, not a vulnerability.

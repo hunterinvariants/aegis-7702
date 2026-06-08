@@ -1,31 +1,14 @@
 from slither.detectors.abstract_detector import AbstractDetector, DetectorClassification
 
-
-def _recovers_signature(f):
-    """True if f recovers an ECDSA signer: raw `ecrecover` builtin OR a library .recover/.tryRecover
-    (OpenZeppelin ECDSA). Lazy imports so a wrong IR class name can't break the plugin."""
-    try:
-        from slither.slithir.operations import SolidityCall, InternalCall, LibraryCall, HighLevelCall
-    except Exception:
-        return False
-    for node in f.nodes:
-        for ir in node.irs:
-            nm = ""
-            if isinstance(ir, SolidityCall):
-                nm = (getattr(ir.function, "name", "") or "").lower()
-            elif isinstance(ir, (InternalCall, LibraryCall, HighLevelCall)):
-                fn = getattr(ir, "function", None)
-                nm = (getattr(fn, "name", "") or "").lower() if fn else ""
-            if "ecrecover" in nm or nm in ("recover", "tryrecover"):
-                return True
-    return False
+from slither_eip7702.detectors._util import recovers_signature
 
 
 class ReplayUnsafeSig(AbstractDetector):
     """ecrecover/ECDSA.recover over a digest that omits chain/contract binding -> cross-chain replay (V3).
 
-    Heuristic: an entrypoint that recovers a signature but neither reads `block.chainid` nor touches a
-    domain-separator-like state var (domain/separator).
+    Heuristic: an entrypoint that recovers a signature (including when the recovery is wrapped in an
+    internal/library helper) but neither reads `block.chainid` nor touches a domain-separator-like
+    state var (domain/separator).
     """
 
     ARGUMENT = "eip7702-replay-unsafe-sig"
@@ -55,7 +38,7 @@ class ReplayUnsafeSig(AbstractDetector):
         results = []
         for contract in self.compilation_unit.contracts_derived:
             for f in contract.functions_entry_points:
-                if f.is_constructor or not _recovers_signature(f):
+                if f.is_constructor or not recovers_signature(f):
                     continue
                 reads_chainid = any(getattr(v, "name", "") == "block.chainid"
                                     for v in f.solidity_variables_read)

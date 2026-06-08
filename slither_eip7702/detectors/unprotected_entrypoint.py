@@ -1,14 +1,19 @@
 from slither.detectors.abstract_detector import AbstractDetector, DetectorClassification
 
+from slither_eip7702.detectors._util import recovers_signature
+
 
 class UnprotectedEntrypoint(AbstractDetector):
     """EIP-7702 delegate exposes an arbitrary-call entrypoint with no caller check.
 
-    Heuristic (v0): a public/external entrypoint that performs a low-level external call
-    (call/delegatecall) while NEITHER the function body NOR any of its modifiers reads
-    `msg.sender`. Honest limit: it only checks that msg.sender is read *somewhere* (a gate
-    exists), not that the comparison is correct (== address(this) / owner). Refine once the
-    corpus two-way proof is wired (V0 must fire, the guarded control must stay clean).
+    Heuristic: a public/external entrypoint that performs a low-level external call (call/delegatecall)
+    while the caller is gated by NEITHER of the two authorization shapes a 7702 delegate can use:
+      (1) `msg.sender` is read in the function body or a modifier (an address gate), OR
+      (2) the function recovers an ECDSA signature (a signature gate) -- raw `ecrecover` or
+          `ECDSA.recover`, including when wrapped in an internal/library helper (see `_util`).
+    Honest limit: it checks that *a* gate exists, not that the comparison is correct
+    (== address(this) / owner). V0 (no gate at all) must fire; the signature- and address-guarded
+    controls must stay clean.
     """
 
     ARGUMENT = "eip7702-unprotected-entrypoint"
@@ -49,6 +54,9 @@ class UnprotectedEntrypoint(AbstractDetector):
                 for mod in function.modifiers:
                     reads += list(mod.solidity_variables_read)
                 gated = any(getattr(v, "name", "") == "msg.sender" for v in reads)
+                # a signature gate (ecrecover / ECDSA.recover, incl. helper-wrapped) also authorizes
+                if not gated and recovers_signature(function):
+                    gated = True
                 if gated:
                     continue
                 info = [

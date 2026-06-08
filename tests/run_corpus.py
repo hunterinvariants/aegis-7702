@@ -2,6 +2,8 @@
 """Two-way corpus proof for the slither-eip7702 detector pack.
 
 For each detector: assert it FIRES on its known-bad case AND stays CLEAN on its safe control.
+Plus REGRESSION locks: fixtures that pin a specific cross-detector behavior (e.g. the transitive
+signature-recovery fix -- ecrecover wrapped in an internal helper).
 Run from the project root (slither + solc installed):  python tests/run_corpus.py
 """
 import json
@@ -28,6 +30,16 @@ MANIFEST = {
     "eip7702-storage-collision": (
         "corpus/vulnerable/PlainStorageDelegate.sol", "corpus/safe/NamespacedDelegate.sol"),
 }
+
+# (sol_file, must_fire[], must_stay_clean[]) -- pins behavior that spans more than one detector.
+REGRESSION = [
+    # Transitive signature recovery: ecrecover wrapped in an internal helper (_checkSig). The
+    # signed action with no nonce / no chain binding must be caught (missing-nonce + replay), and
+    # unprotected-entrypoint must NOT fire -- recovering a signature IS a caller gate, even via helper.
+    ("corpus/vulnerable/HelperWrappedSig.sol",
+     ["eip7702-missing-nonce", "eip7702-replay-unsafe-sig"],
+     ["eip7702-unprotected-entrypoint"]),
+]
 
 
 def count_findings(sol_path: str, argument: str) -> int:
@@ -64,7 +76,28 @@ def main() -> int:
         print(f"          safe {safe} -> {nsafe} (expect 0)   {'OK' if ok_safe else 'XX'}")
     total = passed + failed
     print(f"\n{passed}/{total} detectors pass the two-way proof")
-    return 0 if failed == 0 else 1
+
+    rpassed = rfailed = 0
+    if REGRESSION:
+        print("\nregression locks:")
+        for sol, must_fire, must_clean in REGRESSION:
+            line_ok = True
+            print(f"  {sol}")
+            for arg in must_fire:
+                n = count_findings(sol, arg)
+                ok = n >= 1
+                line_ok = line_ok and ok
+                print(f"          fire  {arg} -> {n} (expect >=1) {'OK' if ok else 'XX'}")
+            for arg in must_clean:
+                n = count_findings(sol, arg)
+                ok = n == 0
+                line_ok = line_ok and ok
+                print(f"          clean {arg} -> {n} (expect 0)   {'OK' if ok else 'XX'}")
+            rpassed += int(line_ok)
+            rfailed += int(not line_ok)
+        print(f"\n{rpassed}/{rpassed + rfailed} regression cases pass")
+
+    return 0 if (failed == 0 and rfailed == 0) else 1
 
 
 if __name__ == "__main__":

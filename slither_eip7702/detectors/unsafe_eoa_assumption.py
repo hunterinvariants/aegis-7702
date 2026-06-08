@@ -5,8 +5,10 @@ class UnsafeEoaAssumption(AbstractDetector):
     """Protocol relies on `tx.origin == msg.sender` to mean 'caller is a plain EOA' -- EIP-7702
     breaks that: a delegated EOA runs contract code while msg.sender == tx.origin.
 
-    Heuristic: flag any function/modifier with a node that reads BOTH `tx.origin` and `msg.sender`
-    (the canonical EOA-check comparison). Low-FP -- comparing the two is almost always the assumption.
+    Heuristic: flag a function/modifier with a node that COMPARES `tx.origin` and `msg.sender`
+    (an `==` / `!=` between them) -- the canonical EOA check. A node that merely reads both without
+    comparing them (e.g. `keccak256(abi.encode(tx.origin, msg.sender))`) is NOT the assumption and is
+    not flagged.
     """
 
     ARGUMENT = "eip7702-unsafe-eoa-assumption"
@@ -34,14 +36,29 @@ class UnsafeEoaAssumption(AbstractDetector):
     )
 
     def _detect(self):
+        try:
+            from slither.slithir.operations import Binary, BinaryType
+            _CMP = (BinaryType.EQUAL, BinaryType.NOT_EQUAL)
+        except Exception:
+            Binary = None
+            _CMP = ()
         results = []
         for contract in self.compilation_unit.contracts_derived:
             for scope in list(contract.functions) + list(contract.modifiers):
                 hit = False
                 for node in scope.nodes:
                     names = {getattr(v, "name", "") for v in node.solidity_variables_read}
-                    if "tx.origin" in names and "msg.sender" in names:
-                        hit = True
+                    if "tx.origin" not in names or "msg.sender" not in names:
+                        continue
+                    # require an actual == / != comparison in this node, not a mere co-read
+                    if Binary is None:
+                        hit = True  # fallback: cannot introspect IR -> keep prior behavior
+                        break
+                    for ir in node.irs:
+                        if isinstance(ir, Binary) and getattr(ir, "type", None) in _CMP:
+                            hit = True
+                            break
+                    if hit:
                         break
                 if hit:
                     info = [

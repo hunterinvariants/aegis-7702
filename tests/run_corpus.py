@@ -39,6 +39,11 @@ REGRESSION = [
     ("corpus/vulnerable/HelperWrappedSig.sol",
      ["eip7702-missing-nonce", "eip7702-replay-unsafe-sig"],
      ["eip7702-unprotected-entrypoint"]),
+    # Co-read without comparison: reads tx.origin AND msg.sender but never compares them -> NOT the
+    # is-EOA assumption, so unsafe-eoa-assumption must stay quiet (pre-M1 it false-fired here).
+    ("corpus/safe/TxOriginCoread.sol",
+     [],
+     ["eip7702-unsafe-eoa-assumption"]),
 ]
 
 

@@ -1,14 +1,15 @@
 from slither.detectors.abstract_detector import AbstractDetector, DetectorClassification
 
-from slither_eip7702.detectors._util import recovers_signature
+from slither_eip7702.detectors._util import recovers_signature, is_state_changing
 
 
 class MissingNonce(AbstractDetector):
     """A signature-authorized action with no nonce -> replayable against the delegated account (V5).
 
-    Heuristic: an entrypoint that recovers a signature (ecrecover or ECDSA.recover, including when the
-    recovery is wrapped in an internal/library helper) but neither reads nor writes a nonce-like state
-    var (nonce/used/consumed/seen/executed).
+    Heuristic: a state-changing entrypoint that recovers a signature (ecrecover or ECDSA.recover,
+    including when the recovery is wrapped in an internal/library helper) but neither reads nor writes a
+    nonce-like state var (nonce/used/consumed/seen/executed). View/pure functions are skipped -- a
+    signature recovered without any state change has no action to replay.
     """
 
     ARGUMENT = "eip7702-missing-nonce"
@@ -37,7 +38,7 @@ class MissingNonce(AbstractDetector):
         results = []
         for contract in self.compilation_unit.contracts_derived:
             for f in contract.functions_entry_points:
-                if f.is_constructor or not recovers_signature(f):
+                if f.is_constructor or not recovers_signature(f) or not is_state_changing(f):
                     continue
                 touched = list(f.state_variables_read) + list(f.state_variables_written)
                 if any(any(k in v.name.lower() for k in self._NONCE) for v in touched):

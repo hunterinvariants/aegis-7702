@@ -1,14 +1,16 @@
 from slither.detectors.abstract_detector import AbstractDetector, DetectorClassification
 
-from slither_eip7702.detectors._util import recovers_signature
+from slither_eip7702.detectors._util import recovers_signature, is_state_changing, binds_chain
 
 
 class ReplayUnsafeSig(AbstractDetector):
     """ecrecover/ECDSA.recover over a digest that omits chain/contract binding -> cross-chain replay (V3).
 
-    Heuristic: an entrypoint that recovers a signature (including when the recovery is wrapped in an
-    internal/library helper) but neither reads `block.chainid` nor touches a domain-separator-like
-    state var (domain/separator).
+    Heuristic: a state-changing entrypoint that recovers a signature (including when the recovery is
+    wrapped in an internal/library helper) whose digest is not bound to the chain -- it neither reads
+    `block.chainid`, invokes the `chainid()` opcode (incl. via an assembly getChainId helper), nor
+    touches a domain-separator-like state var, transitively through its helpers. View/pure functions are
+    skipped -- a signature recovered without any state change has no action to replay.
     """
 
     ARGUMENT = "eip7702-replay-unsafe-sig"
@@ -32,19 +34,13 @@ class ReplayUnsafeSig(AbstractDetector):
         "or use an EIP-712 domain separator."
     )
 
-    _DOMAIN = ("domain", "separator")
-
     def _detect(self):
         results = []
         for contract in self.compilation_unit.contracts_derived:
             for f in contract.functions_entry_points:
-                if f.is_constructor or not recovers_signature(f):
+                if f.is_constructor or not recovers_signature(f) or not is_state_changing(f):
                     continue
-                reads_chainid = any(getattr(v, "name", "") == "block.chainid"
-                                    for v in f.solidity_variables_read)
-                touched = list(f.state_variables_read) + list(f.state_variables_written)
-                uses_domain = any(any(k in v.name.lower() for k in self._DOMAIN) for v in touched)
-                if reads_chainid or uses_domain:
+                if binds_chain(f):
                     continue
                 info = [
                     "EIP-7702 chain-replayable signature: ",

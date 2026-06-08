@@ -34,7 +34,7 @@ quiet on one we know is safe. The repo ships both, and the check is one command:
 
 We also ran the full pack against The Red Guild's `7702-goat`
 (https://github.com/theredguild/7702-goat), the public collection of intentionally-broken 7702
-delegates, and it flags every vulnerability class in there (V0 through V6).
+delegates, and it flags every vulnerability class in there (V0 through V6) -- reproducible with ./run_goat.sh; the per-class result is committed in runs/goat.txt.
 
 ## Install
 

@@ -7,6 +7,7 @@ dist/
 .venv/
 venv/
 .DS_Store
-lib/
+lib/*
+!lib/forge-std
 out/
 cache/

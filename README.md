@@ -1,4 +1,5 @@
 # Aegis-7702
+[![two-way proof](https://github.com/hunterinvariants/aegis-7702/actions/workflows/ci.yml/badge.svg)](https://github.com/hunterinvariants/aegis-7702/actions/workflows/ci.yml)
 
 A Slither plugin that catches the security bugs specific to EIP-7702 smart-account delegates -- the
 ones a normal contract-by-contract review walks straight past.
